@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Automation Reports</title>
     <style>
-      body {
+        body {
             font-family: Arial, sans-serif;
             margin: 20px;
             background-color: #1f1f1f;
@@ -39,48 +39,15 @@
             margin: 0 auto;
             margin-bottom: 20px;
         }
-        /* Adjusting width of Name column to accommodate longer file names */
-        th:nth-child(1),
-        td:nth-child(1) {
-            width: 30%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        /* Adjusting width of Last Modified column */
-        th:nth-child(2),
-        td:nth-child(2) {
+        th:nth-child(1), td:nth-child(1),
+        th:nth-child(2), td:nth-child(2),
+        th:nth-child(3), td:nth-child(3),
+        th:nth-child(4), td:nth-child(4),
+        th:nth-child(5), td:nth-child(5) {
             width: 20%;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-        /* Adjusting width of Size column */
-        th:nth-child(3),
-        td:nth-child(3) {
-            width: 15%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        /* Adjusting width of Category column */
-        th:nth-child(4),
-        td:nth-child(4) {
-            width: 15%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        /* Adjusting width of Test Results column */
-        th:nth-child(5),
-        td:nth-child(5) {
-            width: 15%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .sort-icon {
-            margin-left: 5px;
         }
     </style>
 </head>
@@ -92,10 +59,10 @@
         <thead>
             <tr>
                 <th>Name</th>
-                <th onclick="toggleSort()">Last Modified<span id="sortIcon" class="sort-icon">&#x25B2;</span></th>
+                <th>Last Modified</th>
                 <th>Size</th>
-                <th>Category</th> <!-- New column for Category -->
-                <th>Test Results</th> <!-- New column for Test Results -->
+                <th>Category</th>
+                <th>Test Results</th>
             </tr>
         </thead>
         <tbody id="fileList">
@@ -104,79 +71,34 @@
     </table>
 
     <script>
-        let ascendingOrder = false;
-
-        // Function to toggle sorting order
-        function toggleSort() {
-            ascendingOrder = !ascendingOrder;
-            sortFiles();
-            const sortIcon = document.getElementById('sortIcon');
-            sortIcon.innerHTML = ascendingOrder ? '&#x25B2;' : '&#x25BC;';
-        }
-
-        // Function to sort files by timestamp
-        function sortFiles() {
-            const tableBody = document.getElementById('fileList');
-            const rows = Array.from(tableBody.querySelectorAll('tr'));
-
-            rows.sort((a, b) => {
-                const dateA = new Date(a.querySelector('td:nth-child(2)').textContent).getTime();
-                const dateB = new Date(b.querySelector('td:nth-child(2)').textContent).getTime();
-
-                return ascendingOrder ? dateA - dateB : dateB - dateA;
-            });
-
-            rows.forEach(row => tableBody.appendChild(row));
-        }
-
-        // Function to categorize HTML reports based on file name
         function categorizeReports(fileName) {
-            if (fileName.includes('rdaf-cli')) {
+            if (fileName.includes('RDAF_CLI')) {
                 return 'RDAF CLI';
             } else if (fileName.includes('sanity')) {
                 return 'BOT';
-            } else if (fileName.includes('status')) {
+            } else if (fileName.includes('UI')) {
                 return 'UI/UX';
-            } else if (fileName.includes('cfx_api_test')) {
+            } else if (fileName.includes('API')) {
                 return 'API';
             } else {
                 return 'Other';
             }
         }
-       
-        function fetchTestResults(fileURL, resultCell) {
-        fetch(fileURL)
-         .then(response => response.text())
-         .then(data => {
-            const parser = new DOMParser();
-            const htmlDocument = parser.parseFromString(data, 'text/html');
-
-            const passedElement = htmlDocument.querySelector('.passed');
-            const failedElement = htmlDocument.querySelector('.failed');
-
-            const passedTests = parseInt(passedElement.textContent);
-            const failedTests = parseInt(failedElement.textContent);
-
-            resultCell.textContent = `PASSED: ${passedTests}, FAILED: ${failedTests}`;
-          })
-         .catch(error => console.error('Error fetching test results:', error));
-        }
-
 
         function fetchFiles() {
-            fetch("./")
+            fetch('reports/')
                 .then(response => response.text())
                 .then(data => {
                     const parser = new DOMParser();
                     const htmlDocument = parser.parseFromString(data, 'text/html');
-                    const fileList = htmlDocument.querySelectorAll('a[href$=".html"]:not([href="testReports.html"]):not([href="reports.html"])');
+                    const fileList = htmlDocument.querySelectorAll('a[href$=".html"]');
 
                     const tableBody = document.getElementById('fileList');
 
                     if (fileList.length > 0) {
                         fileList.forEach(file => {
                             const fileName = file.textContent;
-                            const fileURL = file.getAttribute('href');
+                            const fileURL = `reports/${fileName}`;
                             const fileRow = document.createElement('tr');
 
                             const nameCell = document.createElement('td');
@@ -191,12 +113,12 @@
                             sizeCell.textContent = 'Unknown';
                             fileRow.appendChild(sizeCell);
 
-                            const categoryCell = document.createElement('td'); // New cell for Category
+                            const categoryCell = document.createElement('td');
                             categoryCell.textContent = categorizeReports(fileName);
                             fileRow.appendChild(categoryCell);
 
-                            const testResultsCell = document.createElement('td'); // New cell for Test Results
-                            testResultsCell.textContent = ''; // Test results will be fetched later
+                            const testResultsCell = document.createElement('td');
+                            testResultsCell.textContent = 'Unknown'; // Placeholder text
                             fileRow.appendChild(testResultsCell);
 
                             tableBody.appendChild(fileRow);
@@ -219,20 +141,36 @@
                                     sizeCell.textContent = `${fileSize} KB`;
                                 })
                                 .catch(error => console.error('Error fetching file size:', error));
-
+                            
                             // Fetch test results
-                            fetchTestResults(fileURL, testResultsCell);
+                            fetch(fileURL)
+                                .then(response => response.text())
+                                .then(data => {
+                                    const parser = new DOMParser();
+                                    const htmlDocument = parser.parseFromString(data, 'text/html');
+                                    const passedElement = htmlDocument.querySelector('.passed');
+                                    const failedElement = htmlDocument.querySelector('.failed');
+
+                                    if (passedElement && failedElement) {
+                                        const passedTests = parseInt(passedElement.textContent);
+                                        const failedTests = parseInt(failedElement.textContent);
+                                        testResultsCell.textContent = `PASSED: ${passedTests}, FAILED: ${failedTests}`;
+                                    } else {
+                                        testResultsCell.textContent = 'Unknown';
+                                    }
+                                })
+                                .catch(error => console.error('Error fetching test results:', error));
                         });
                     } else {
                         const noFilesRow = document.createElement('tr');
-                        noFilesRow.innerHTML = '<td colspan="5">No files found.</td>'; // Adjust colspan for new columns
+                        noFilesRow.innerHTML = '<td colspan="5">No files found.</td>';
                         tableBody.appendChild(noFilesRow);
                     }
                 })
                 .catch(error => console.error('Error fetching files:', error));
         }
+
         fetchFiles();
     </script>
-
 </body>
 </html>
