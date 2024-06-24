@@ -71,6 +71,69 @@
     </table>
 
     <script>
+        async function fetchReports() {
+            const response = await fetch('reports/');
+            const text = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            const links = Array.from(doc.querySelectorAll('a[href$=".html"]'));
+            const tableBody = document.getElementById('fileList');
+
+            if (links.length > 0) {
+                links.forEach(link => {
+                    const fileName = link.getAttribute('href');
+                    const fileURL = `reports/${fileName}`;
+                    const fileRow = document.createElement('tr');
+
+                    const nameCell = document.createElement('td');
+                    nameCell.innerHTML = `<a href="${fileURL}">${fileName}</a>`;
+                    fileRow.appendChild(nameCell);
+
+                    const detailsCell = document.createElement('td');
+                    detailsCell.textContent = 'Unknown';
+                    fileRow.appendChild(detailsCell);
+
+                    const sizeCell = document.createElement('td');
+                    sizeCell.textContent = 'Unknown';
+                    fileRow.appendChild(sizeCell);
+
+                    const categoryCell = document.createElement('td');
+                    categoryCell.textContent = categorizeReports(fileName);
+                    fileRow.appendChild(categoryCell);
+
+                    const testResultsCell = document.createElement('td');
+                    testResultsCell.textContent = 'Unknown';
+                    fileRow.appendChild(testResultsCell);
+
+                    tableBody.appendChild(fileRow);
+
+                    fetch(fileURL)
+                        .then(response => {
+                            detailsCell.textContent = new Date(response.headers.get('last-modified')).toLocaleString();
+                            response.blob().then(blob => {
+                                sizeCell.textContent = `${(blob.size / 1024).toFixed(2)} KB`;
+                            });
+                            return response.text();
+                        })
+                        .then(data => {
+                            const reportDoc = parser.parseFromString(data, 'text/html');
+                            const passed = reportDoc.querySelector('.passed');
+                            const failed = reportDoc.querySelector('.failed');
+                            if (passed && failed) {
+                                testResultsCell.textContent = `PASSED: ${passed.textContent}, FAILED: ${failed.textContent}`;
+                            } else {
+                                testResultsCell.textContent = 'N/A';
+                            }
+                        })
+                        .catch(error => console.error('Error fetching file details:', error));
+                });
+            } else {
+                const noFilesRow = document.createElement('tr');
+                noFilesRow.innerHTML = '<td colspan="5">No files found.</td>';
+                tableBody.appendChild(noFilesRow);
+            }
+        }
+
         function categorizeReports(fileName) {
             if (fileName.includes('RDAF_CLI')) {
                 return 'RDAF CLI';
@@ -85,92 +148,7 @@
             }
         }
 
-        function fetchFiles() {
-            fetch('reports/')
-                .then(response => response.text())
-                .then(data => {
-                    const parser = new DOMParser();
-                    const htmlDocument = parser.parseFromString(data, 'text/html');
-                    const fileList = htmlDocument.querySelectorAll('a[href$=".html"]');
-
-                    const tableBody = document.getElementById('fileList');
-
-                    if (fileList.length > 0) {
-                        fileList.forEach(file => {
-                            const fileName = file.textContent;
-                            const fileURL = `reports/${fileName}`;
-                            const fileRow = document.createElement('tr');
-
-                            const nameCell = document.createElement('td');
-                            nameCell.innerHTML = `<a href="${fileURL}">${fileName}</a>`;
-                            fileRow.appendChild(nameCell);
-
-                            const detailsCell = document.createElement('td');
-                            detailsCell.textContent = 'Unknown';
-                            fileRow.appendChild(detailsCell);
-
-                            const sizeCell = document.createElement('td');
-                            sizeCell.textContent = 'Unknown';
-                            fileRow.appendChild(sizeCell);
-
-                            const categoryCell = document.createElement('td');
-                            categoryCell.textContent = categorizeReports(fileName);
-                            fileRow.appendChild(categoryCell);
-
-                            const testResultsCell = document.createElement('td');
-                            testResultsCell.textContent = 'Unknown'; // Placeholder text
-                            fileRow.appendChild(testResultsCell);
-
-                            tableBody.appendChild(fileRow);
-
-                            // Fetch last modified date
-                            fetch(fileURL)
-                                .then(response => response.headers.get('last-modified'))
-                                .then(lastModified => {
-                                    if (lastModified) {
-                                        detailsCell.textContent = new Date(lastModified).toLocaleString();
-                                    }
-                                })
-                                .catch(error => console.error('Error fetching last modified date:', error));
-
-                            // Fetch file size
-                            fetch(fileURL)
-                                .then(response => response.blob())
-                                .then(blob => {
-                                    const fileSize = (blob.size / 1024).toFixed(2);
-                                    sizeCell.textContent = `${fileSize} KB`;
-                                })
-                                .catch(error => console.error('Error fetching file size:', error));
-                            
-                            // Fetch test results
-                            fetch(fileURL)
-                                .then(response => response.text())
-                                .then(data => {
-                                    const parser = new DOMParser();
-                                    const htmlDocument = parser.parseFromString(data, 'text/html');
-                                    const passedElement = htmlDocument.querySelector('.passed');
-                                    const failedElement = htmlDocument.querySelector('.failed');
-
-                                    if (passedElement && failedElement) {
-                                        const passedTests = parseInt(passedElement.textContent);
-                                        const failedTests = parseInt(failedElement.textContent);
-                                        testResultsCell.textContent = `PASSED: ${passedTests}, FAILED: ${failedTests}`;
-                                    } else {
-                                        testResultsCell.textContent = 'Unknown';
-                                    }
-                                })
-                                .catch(error => console.error('Error fetching test results:', error));
-                        });
-                    } else {
-                        const noFilesRow = document.createElement('tr');
-                        noFilesRow.innerHTML = '<td colspan="5">No files found.</td>';
-                        tableBody.appendChild(noFilesRow);
-                    }
-                })
-                .catch(error => console.error('Error fetching files:', error));
-        }
-
-        fetchFiles();
+        fetchReports();
     </script>
 </body>
 </html>
